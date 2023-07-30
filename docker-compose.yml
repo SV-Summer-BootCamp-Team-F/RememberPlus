@@ -1,0 +1,52 @@
+version: '3'
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: container_neo4j
+    ports:
+      - "7689:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/123412341234           # 사용자:비밀번호        # 1) Use a stronger password.
+      - NEO4J_dbms_security_auth__minimum__password__length=12  # 3) Set environment variable NEO4J_dbms_security_auth__minimum__password__length to override the minimum password length requirement.
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+    volumes:
+      - ./neo4j_data:/var/lib/neo4j/data    # ./ <- 상대경로 /<- 절대경로  깃 이그노어에 추가시켜야함 !!!!!
+#    healthcheck:                  #neo4j 헬스체크(의존성 성립)
+#      test: ["CMD-SHELL", "python -c \"from neo4j import GraphDatabase; driver = GraphDatabase.driver('bolt://neo4j:7689', auth=('neo4j', '123412341234')); with driver.session() as session: session.run('MATCH (n) RETURN COUNT(n)')\""]
+#      interval: 10s
+#      timeout: 2s
+#      retries: 10
+
+  django:
+    build:                    #허브에 올라가있는 이미지는  image를 적어주세용 neo4j의 image를 적어줘   -> 허브 작성 리포지토리 이름 / 유저이미지 이름
+      context: backend   #얘를 사용해서 이미지를 빌드하여 사용하겠다 이말
+      args:
+        DJANGO_ALLOWED_HOSTS: “*”
+        DJANGO_SECRET_KEY: “*”
+        DJANGO_CORS_ORIGIN_WHITELIST: “*”        # 장고 환경변수들 설정 접속권한 허용
+    container_name: container_django
+    volumes:
+      - ./backend/:/backend/
+    expose:
+      - 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - neo4j
+        #condition: service_healthy
+#    command: gunicorn ./backend/backend.wsgi --bind 0.0.0.0:8000
+    command: python manage.py runserver
+
+  nginx:
+    container_name: container_nginx
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro # nginx log path (require same option on nginx container)
+    ports:
+      - "80:80"
+    depends_on:
+      - django
+    expose:
+      - 80
