@@ -17,9 +17,11 @@ services:
 #      timeout: 2s
 #      retries: 10
 
+
+
   django:
     build:                    #허브에 올라가있는 이미지는  image를 적어주세용 neo4j의 image를 적어줘   -> 허브 작성 리포지토리 이름 / 유저이미지 이름
-      context: backend   #얘를 사용해서 이미지를 빌드하여 사용하겠다 이말
+      context: ./backend   #얘를 사용해서 이미지를 빌드하여 사용하겠다 이말
       args:
         DJANGO_ALLOWED_HOSTS: “*”
         DJANGO_SECRET_KEY: “*”
@@ -27,6 +29,7 @@ services:
     container_name: container_django
     volumes:
       - ./backend/:/backend/
+      - ./backend/static/:/backend/static/
     expose:
       - 8000
     ports:
@@ -35,18 +38,39 @@ services:
       - neo4j
         #condition: service_healthy
 #    command: gunicorn ./backend/backend.wsgi --bind 0.0.0.0:8000
-    command: python manage.py runserver
+    command:
+      - gunicorn
+      - "--bind"
+      - "0:8000"
+      - "backend.wsgi:application"
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend/:/frontend
+      - build_folder:/frontend/dist
+      - ./frontend/node_modules/:/frontend/node_modules
+    tty: true
 
   nginx:
     container_name: container_nginx
     build:
-      context: ./
+      context: ./nginx
       dockerfile: Dockerfile
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro # nginx log path (require same option on nginx container)
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - build_folder:/var/www/frontend
+      - ./backend/static/:/backend/static/
     ports:
       - "80:80"
     depends_on:
       - django
+      - frontend
     expose:
       - 80
+
+volumes:
+  build_folder: null
