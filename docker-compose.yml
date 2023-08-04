@@ -72,5 +72,41 @@ services:
     expose:
       - 80
 
+  prometheus:
+    image: prom/prometheus
+    restart: 'no'
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    network_mode: host
+
+  grafana:
+    image: grafana/grafana
+    environment:
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"
+    restart: 'no'
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - 3100:3000
+    depends_on:
+      - prometheus
+    network_mode: host
+
+  node-exporter:
+    image: prom/node-exporter
+    ports:
+      - 9101:9100
+    environment:
+      - "TZ=Asia/Seoul"
+    restart: always
+    command:
+      - --collector.disable-defaults
+      - '--collector.cpu'
+      - '--collector.loadavg'
 volumes:
   build_folder: null
+  prometheus_data: { }
+  grafana_data: { }
